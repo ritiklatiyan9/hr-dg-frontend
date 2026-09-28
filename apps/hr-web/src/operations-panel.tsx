@@ -60,6 +60,7 @@ type Snapshot = {
   me: string | null;
   approvers: Row[];
   serverTime: string;
+  timezone?: string;
   policy: Row | null;
   geofence: Row | null;
   sessions: Row[];
@@ -135,6 +136,45 @@ const localDateTime = (date: string) => {
 };
 const attendancePhotoUrl = (siteId: string, photoId: string) =>
   `/files/attachments/${encodeURIComponent(photoId)}?siteId=${encodeURIComponent(siteId)}&preview=1`;
+async function prepareAttendancePhoto(file: File): Promise<Blob> {
+  // The web proxy has a smaller request-body limit than private storage.
+  if (file.size <= 3 * 1024 * 1024) return file;
+  let objectUrl: string | undefined;
+  let image: ImageBitmap | HTMLImageElement;
+  try {
+    image = await createImageBitmap(file);
+  } catch {
+    objectUrl = URL.createObjectURL(file);
+    image = new Image();
+    image.src = objectUrl;
+    try {
+      await image.decode();
+    } catch {
+      URL.revokeObjectURL(objectUrl);
+      throw Error("Cannot read this photo. Choose a JPEG or PNG image.");
+    }
+  }
+  try {
+    const scale = Math.min(1, 1280 / Math.max(image.width, image.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(image.width * scale));
+    canvas.height = Math.max(1, Math.round(image.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw Error("Cannot prepare attendance photo on this device");
+    context.fillStyle = "#fff";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    const resized = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/jpeg", 0.8),
+    );
+    if (!resized || resized.size > 3 * 1024 * 1024)
+      throw Error("Photo is too large. Retake it at a lower resolution.");
+    return resized;
+  } finally {
+    if ("close" in image) image.close();
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
+  }
+}
 function AttendancePhotoEvidence({
   siteId,
   photoId,
@@ -184,6 +224,8 @@ type ReviewDay = {
   events: Row[];
   adjustments: Row[];
   truncated: boolean;
+  earlierPendingCount: number;
+  oldestPendingDate: string | null;
 };
 type ReviewItem = {
   id: string;
@@ -426,6 +468,21 @@ function AttendanceReviewDesk({
           </Button>
         </div>
       </header>
+      {!!review?.earlierPendingCount && review.oldestPendingDate && (
+        <div className="rd-authority" role="status">
+          <span>
+            {review.earlierPendingCount} earlier attendance request(s) still
+            await review.
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onDayChange(review.oldestPendingDate!)}
+          >
+            Open {review.oldestPendingDate}
+          </Button>
+        </div>
+      )}
       <div className="rd-kpis" aria-label="Daily review totals">
         {[
           ["Awaiting decision", pending.length, "warning"],
@@ -670,6 +727,13 @@ function AttendanceReviewDesk({
                                 : "—"}
                             </dd>
                           </div>
+                          {active.row.classification !== "inside" &&
+                            active.row.location_reason && (
+                              <div className="rd-span">
+                                <dt>GPS detail</dt>
+                                <dd>{active.row.location_reason}</dd>
+                              </div>
+                            )}
                           {active.pending && (
                             <div className="rd-span">
                               <dt>Why review is needed</dt>
@@ -1088,9 +1152,31 @@ export function OperationsPanel({
   if (q.error && !reviewOnly && !attendanceOnly)
     return <ErrorState error={q.error} retry={() => void q.refetch()} />;
   if (!data) return null;
-  const open = data.sessions.find(
+  const oldOpen = data.sessions.find(
     (d) => d.employee_id === data.me && d.status === "open",
   );
+  const open =
+    oldOpen &&
+    Date.now() <
+      Date.parse(
+        oldOpen.expires_at ??
+          new Date(
+            Date.parse(oldOpen.opened_at) +
+              (data.policy?.rules?.maxSessionHours ?? 24) * 3_600_000,
+          ).toISOString(),
+      )
+      ? oldOpen
+      : undefined;
+  const earlierPending = data.events.filter(
+    (e) =>
+      e.status === "pending_verification" &&
+      data.sessions.some(
+        (d) =>
+          d.id === e.duty_id &&
+          d.employee_id === data.me &&
+          (d.status !== "open" || d.id !== open?.id),
+      ),
+  ).length;
   const ownEvents = data.events.filter((e) => e.duty_id === open?.id);
   const needsIn =
     !open ||
@@ -1139,6 +1225,8 @@ export function OperationsPanel({
         input.click();
       });
       if (!file) return;
+      const evidence = await prepareAttendancePhoto(file);
+      checkScope();
       setCaptureStage("Checking site location…");
       let location = await position;
       checkScope();
@@ -1149,8 +1237,6 @@ export function OperationsPanel({
       )
         location = await getLocation();
       checkScope();
-      const capturedAt = new Date().toISOString(),
-        clientId = id();
       let offsiteReason: string | undefined;
       if (
         kind === "OUT" &&
@@ -1168,18 +1254,32 @@ export function OperationsPanel({
         offsiteReason = reason;
         checkScope();
       }
+      if (
+        location &&
+        Date.now() - Date.parse(location.observedAt) >
+          Math.min(15, data!.policy!.rules.freshnessSeconds) * 1000
+      ) {
+        location = await getLocation();
+        checkScope();
+      }
+      const capturedAt = new Date().toISOString(),
+        clientId = id();
       setCaptureStage("Uploading photo and recording attendance…");
       const intent = await write<any>(OperateDocument, {
         operation: "fileIntent",
         input: {
           clientId,
           purpose: "attendance",
-          type: file.type,
-          bytes: file.size,
+          type: evidence.type,
+          bytes: evidence.size,
         },
       });
       checkScope();
-      const uploaded = await uploadEvidence(s.siteId, intent.operate.id, file);
+      const uploaded = await uploadEvidence(
+        s.siteId,
+        intent.operate.id,
+        evidence,
+      );
       checkScope();
       if (uploaded.status !== "ready")
         throw Error(
@@ -1352,7 +1452,11 @@ export function OperationsPanel({
               </Badge>
               <h2>
                 {open
-                  ? fmt(open.opened_at)
+                  ? new Intl.DateTimeFormat("en-IN", {
+                      timeZone: data.timezone,
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    }).format(new Date(open.opened_at))
                   : t(
                       "Ready when your day begins.",
                       "आपका दिन शुरू होने पर तैयार।",
@@ -1381,6 +1485,13 @@ export function OperationsPanel({
             <Notice>
               Your OUT request is awaiting attendance approval. It has not
               closed or confirmed the duty yet.
+            </Notice>
+          )}
+          {earlierPending > 0 && (
+            <Notice>
+              {earlierPending} earlier attendance entry(s) still await HR
+              review. Open Attendance and choose the capture date to see the
+              evidence.
             </Notice>
           )}
           {!data.me && (
@@ -1443,7 +1554,7 @@ export function OperationsPanel({
         <AttendanceRecordsDesk
           siteName={s.siteName}
           workDate={attendanceOnly ? attendanceDay : undefined}
-          timezone={attendanceQ.data?.attendanceDay.timezone}
+          timezone={attendanceQ.data?.attendanceDay.timezone ?? data.timezone}
           employeeId={attendanceEmployee}
           employees={employees}
           onDateChange={(day) => {

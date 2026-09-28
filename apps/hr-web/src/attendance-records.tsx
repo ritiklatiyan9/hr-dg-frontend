@@ -61,13 +61,15 @@ const eventStatus = (status: string) =>
 const statusPill = (s: Row): [Tone, string] =>
   s.pendingIn
     ? ["warning", "Check-in awaiting review"]
-    : s.stale
-      ? ["warning", "Exit not recorded"]
-      : s.status === "open"
-        ? ["success", "On duty"]
-        : s.status === "closed"
-          ? ["neutral", "Completed"]
-          : ["warning", humanize(String(s.status))];
+    : s.status === "needs_review"
+      ? ["warning", "Exit needs review"]
+      : s.stale
+        ? ["warning", "Exit not recorded"]
+        : s.status === "open"
+          ? ["success", "On duty"]
+          : s.status === "closed"
+            ? ["neutral", "Completed"]
+            : ["warning", humanize(String(s.status))];
 const exceptions = (s: Row) =>
   [
     s.stale && "Exit not recorded",
@@ -165,8 +167,11 @@ export function AttendanceRecordsDesk({
         e.status === "pending_verification",
     ),
     stale:
-      s.status === "open" &&
-      Date.now() - Date.parse(s.opened_at) > maxSessionHours * 3_600_000,
+      (s.status === "open" || s.status === "needs_review") &&
+      (s.status === "needs_review" ||
+        Date.now() >
+          Date.parse(s.expires_at ?? s.opened_at) +
+            (s.expires_at ? 0 : maxSessionHours * 3_600_000)),
   }));
   const person = (s: Row) => s.display_name ?? name(s.employee_id);
   const pending = events.filter((e) => e.status === "pending_verification");
@@ -616,7 +621,15 @@ export function AttendanceRecordsDesk({
                             )}
                           </>
                         ),
-                        note: e.offsite_reason ?? undefined,
+                        note:
+                          [
+                            e.offsite_reason,
+                            e.classification !== "inside"
+                              ? e.location_reason
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || undefined,
                       }))}
                     />
                   ) : (
