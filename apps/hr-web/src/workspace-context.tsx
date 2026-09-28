@@ -78,6 +78,7 @@ export function useWrite() {
   return async <T,>(
     document: DocumentNode,
     variables: Record<string, unknown>,
+    invalidate?: readonly string[],
   ): Promise<T> => {
     const t = scope.boundary.ticket();
     try {
@@ -93,8 +94,14 @@ export function useWrite() {
         );
       // A private upload reservation changes no displayed business data. Avoid
       // refetching the entire workspace before the photo can even upload.
-      if (variables.operation !== "fileIntent")
-        await client.invalidateQueries({ queryKey: scope.key });
+      if (variables.operation !== "fileIntent") {
+        // A completed mutation must not wait for unrelated screens to reload.
+        // Keys capture the original scope; a newer workspace is never invalidated.
+        if (invalidate)
+          for (const suffix of invalidate)
+            void client.invalidateQueries({ queryKey: [...scope.key, suffix] });
+        else await client.invalidateQueries({ queryKey: scope.key });
+      }
       const definition = document.definitions.find(
         (d) => d.kind === "OperationDefinition",
       );

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   DwrChatDocument,
   DwrCommandDocument,
@@ -170,10 +170,14 @@ export function useDwrCommand() {
   return useCallback(
     async <T = any>(operation: string, input: object) =>
       (
-        await write<{ dwrCommand: T }>(DwrCommandDocument, {
-          operation,
-          input,
-        })
+        await write<{ dwrCommand: T }>(
+          DwrCommandDocument,
+          {
+            operation,
+            input,
+          },
+          operation === "markRead" ? [] : ["dwr-chat", "dwr"],
+        )
       ).dwrCommand,
     [write],
   );
@@ -184,7 +188,12 @@ const byTime = (a: Message, b: Message) =>
     : a.createdAt.localeCompare(b.createdAt);
 /** One month of a thread: first page, older pages on demand and 5 s change polling. */
 export function useThread(groupId: string | null, month: string) {
-  const s = useScope();
+  const current = useScope();
+  const scopeIdentity = JSON.stringify(current.key);
+  // Workspace polling replaces its context object without changing access.
+  const s = useMemo(() => current, [scopeIdentity, current.boundary]);
+  const inFlight = useRef<Promise<void> | null>(null);
+  const lifetime = useRef<AbortController | null>(null);
   const [data, setData] = useState<Thread | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [error, setError] = useState<Error | null>(null);
@@ -201,40 +210,55 @@ export function useThread(groupId: string | null, month: string) {
     });
   }, []);
   const refresh = useCallback(
-    async (signal?: AbortSignal) => {
-      const polling = since.current !== null;
-      const result = await chatRead<Thread>(
-        s,
-        {
-          view: "thread",
-          groupId,
-          month,
-          ...(polling ? { since: since.current } : {}),
-        },
-        signal,
-      );
-      since.current = result.serverTime;
-      // Change polls carry no page cursor; keep the first page's pagination.
-      setData((d) =>
-        polling && d
-          ? {
-              ...result,
-              people: { ...d.people, ...result.people },
-              hasMore: d.hasMore,
-              before: d.before,
-            }
-          : result,
-      );
-      merge(result.messages);
-      setError(null);
+    (signal?: AbortSignal): Promise<void> => {
+      if (inFlight.current) return inFlight.current;
+      const active = lifetime.current;
+      const request = (async () => {
+        const requestSignal = signal ?? active?.signal;
+        const polling = since.current !== null;
+        const result = await chatRead<Thread>(
+          s,
+          {
+            view: "thread",
+            groupId,
+            month,
+            ...(polling ? { since: since.current } : {}),
+          },
+          requestSignal,
+        );
+        if (requestSignal?.aborted) return;
+        since.current = result.serverTime;
+        // Change polls carry no page cursor; keep the first page's pagination.
+        setData((d) =>
+          polling && d
+            ? {
+                ...result,
+                people: { ...d.people, ...result.people },
+                hasMore: d.hasMore,
+                before: d.before,
+              }
+            : result,
+        );
+        merge(result.messages);
+        setError(null);
+      })();
+      inFlight.current = request;
+      void request
+        .finally(() => {
+          if (inFlight.current === request) inFlight.current = null;
+        })
+        .catch(() => {});
+      return request;
     },
     [s, groupId, month, merge],
   );
   useEffect(() => {
     const controller = new AbortController();
+    lifetime.current = controller;
     since.current = null;
     setData(null);
     setMessages([]);
+    setLoadingOlder(false);
     setError(null);
     void refresh(controller.signal).catch((e) => {
       if ((e as Error).name !== "AbortError") setError(e as Error);
@@ -245,6 +269,7 @@ export function useThread(groupId: string | null, month: string) {
     }, 5000);
     return () => {
       controller.abort();
+      inFlight.current = null;
       clearInterval(timer);
     };
   }, [refresh]);
@@ -252,13 +277,19 @@ export function useThread(groupId: string | null, month: string) {
     const cursor = data?.before;
     if (!cursor || loadingOlder) return;
     setLoadingOlder(true);
+    const active = lifetime.current;
     try {
-      const page = await chatRead<Thread>(s, {
-        view: "thread",
-        groupId,
-        month,
-        before: cursor,
-      });
+      const page = await chatRead<Thread>(
+        s,
+        {
+          view: "thread",
+          groupId,
+          month,
+          before: cursor,
+        },
+        active?.signal,
+      );
+      if (active?.signal.aborted) return;
       merge(page.messages);
       setData((d) =>
         d
@@ -271,7 +302,7 @@ export function useThread(groupId: string | null, month: string) {
           : d,
       );
     } finally {
-      setLoadingOlder(false);
+      if (!active?.signal.aborted) setLoadingOlder(false);
     }
   }, [s, groupId, month, data?.before, loadingOlder, merge]);
   return {

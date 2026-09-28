@@ -32,23 +32,6 @@ import { humanize } from "./components/shared/status";
 type Row = Record<string, any>;
 type Segment = "all" | "open" | "closed" | "exceptions" | "roster";
 
-const time = new Intl.DateTimeFormat(undefined, {
-  hour: "2-digit",
-  minute: "2-digit",
-});
-const day = new Intl.DateTimeFormat(undefined, {
-  weekday: "short",
-  day: "numeric",
-  month: "short",
-});
-const stamp = new Intl.DateTimeFormat(undefined, {
-  day: "numeric",
-  month: "short",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-const at = (value?: string | null) =>
-  value ? stamp.format(new Date(value)) : "—";
 const duration = (from: string, to?: string | null) => {
   if (!to) return "—";
   const minutes = Math.round((Date.parse(to) - Date.parse(from)) / 60000);
@@ -76,13 +59,15 @@ const eventStatus = (status: string) =>
       ? "Rejected"
       : "Verified";
 const statusPill = (s: Row): [Tone, string] =>
-  s.stale
-    ? ["warning", "Exit not recorded"]
-    : s.status === "open"
-      ? ["success", "On duty"]
-      : s.status === "closed"
-        ? ["neutral", "Completed"]
-        : ["warning", humanize(String(s.status))];
+  s.pendingIn
+    ? ["warning", "Check-in awaiting review"]
+    : s.stale
+      ? ["warning", "Exit not recorded"]
+      : s.status === "open"
+        ? ["success", "On duty"]
+        : s.status === "closed"
+          ? ["neutral", "Completed"]
+          : ["warning", humanize(String(s.status))];
 const exceptions = (s: Row) =>
   [
     s.stale && "Exit not recorded",
@@ -94,6 +79,16 @@ const exceptions = (s: Row) =>
 /** Attendance records in the review-desk layout: KPI strip, queue, inspector. */
 export function AttendanceRecordsDesk({
   siteName,
+  workDate,
+  timezone,
+  employeeId = "",
+  employees = [],
+  onDateChange,
+  onEmployeeChange,
+  offset = 0,
+  hasMore = false,
+  onPageChange,
+  peopleTruncated,
   sessions: recorded,
   maxSessionHours = 24,
   events,
@@ -111,6 +106,16 @@ export function AttendanceRecordsDesk({
   onPreviewPhoto,
 }: {
   siteName: string;
+  workDate?: string;
+  timezone?: string;
+  employeeId?: string;
+  employees?: { id: string; name: string }[];
+  onDateChange?: (day: string) => void;
+  onEmployeeChange?: (id: string) => void;
+  offset?: number;
+  hasMore?: boolean;
+  onPageChange?: (offset: number) => void;
+  peopleTruncated?: boolean;
   sessions: Row[];
   /** Policy limit: an open session older than this lost its exit (as on the dashboard). */
   maxSessionHours?: number;
@@ -128,11 +133,37 @@ export function AttendanceRecordsDesk({
   onRequestCorrection: (session: Row) => void;
   onPreviewPhoto: (photoId: string, label: string) => void;
 }) {
+  const time = new Intl.DateTimeFormat(undefined, {
+    timeZone: timezone,
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const day = new Intl.DateTimeFormat(undefined, {
+    timeZone: timezone,
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
+  const stamp = new Intl.DateTimeFormat(undefined, {
+    timeZone: timezone,
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const at = (value?: string | null) =>
+    value ? stamp.format(new Date(value)) : "—";
   const [segment, setSegment] = useState<Segment>("all");
   const [search, setSearch] = useState("");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const sessions: Row[] = recorded.map((s) => ({
     ...s,
+    pendingIn: events.some(
+      (e) =>
+        e.duty_id === s.id &&
+        e.kind === "IN" &&
+        e.status === "pending_verification",
+    ),
     stale:
       s.status === "open" &&
       Date.now() - Date.parse(s.opened_at) > maxSessionHours * 3_600_000,
@@ -141,7 +172,9 @@ export function AttendanceRecordsDesk({
   const pending = events.filter((e) => e.status === "pending_verification");
   const groups: Record<Exclude<Segment, "roster">, Row[]> = {
     all: sessions,
-    open: sessions.filter((s) => s.status === "open" && !s.stale),
+    open: sessions.filter(
+      (s) => s.status === "open" && !s.stale && !s.pendingIn,
+    ),
     closed: sessions.filter((s) => s.status === "closed"),
     exceptions: sessions.filter((s) => s.late || s.early || s.stale),
   };
@@ -243,7 +276,7 @@ export function AttendanceRecordsDesk({
       <DeskHeader
         crumb="Attendance / Records"
         title="Attendance"
-        subtitle={`${siteName} · Latest ${sessions.length} duty records`}
+        subtitle={`${siteName} · ${workDate ?? "Recent records"}${timezone ? ` · ${timezone}` : ""}`}
       >
         <Button variant="outline" size="sm" onClick={onOpenApprovals}>
           <ClipboardCheck size={15} />
@@ -275,6 +308,72 @@ export function AttendanceRecordsDesk({
           onClick={onRefresh}
         />
       </DeskHeader>
+      {workDate && (
+        <div className="flex flex-wrap items-end gap-3 px-1">
+          <label className="grid gap-1 text-sm">
+            Attendance date
+            <input
+              aria-label="Attendance date"
+              type="date"
+              value={workDate}
+              className="h-9 rounded-md border px-3"
+              onChange={(e) => {
+                if (e.target.value) onDateChange?.(e.target.value);
+              }}
+            />
+          </label>
+          <label className="grid gap-1 text-sm">
+            Employee
+            <select
+              aria-label="Attendance employee"
+              value={employeeId}
+              className="h-9 min-w-52 rounded-md border bg-background px-3"
+              onChange={(e) => onEmployeeChange?.(e.target.value)}
+            >
+              <option value="">All permitted employees</option>
+              {employees.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <span role="status" className="text-muted-foreground text-sm">
+            {fetching
+              ? "Loading attendance…"
+              : `${sessions.length} duty records on this page`}
+          </span>
+          {(offset > 0 || hasMore) && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={offset === 0 || fetching}
+                onClick={() => onPageChange?.(Math.max(0, offset - 100))}
+              >
+                Previous
+              </Button>
+              <span className="text-sm">
+                Page {Math.floor(offset / 100) + 1}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={!hasMore || fetching}
+                onClick={() => onPageChange?.(offset + 100)}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+          {peopleTruncated && (
+            <p className="text-sm">
+              Employee picker shows the first 1,000 permitted employees. All
+              records remain available in the pages.
+            </p>
+          )}
+        </div>
+      )}
       <DeskKpis
         label="Attendance totals"
         items={[
@@ -295,11 +394,11 @@ export function AttendanceRecordsDesk({
           icon: ShieldCheck,
           title: pending.length
             ? `${pending.length} ${pending.length === 1 ? "entry needs" : "entries need"} a decision`
-            : "All recorded entries are verified",
+            : "No pending entries on this page",
           text: "Photo and GPS are supporting evidence, not biometric proof. Unknown GPS time is not absence.",
           pill: pending.length
             ? { tone: "warning", label: "Review pending" }
-            : { tone: "success", label: "Up to date" },
+            : { tone: "success", label: "Received records" },
         }}
       />
       <DeskWorkspace>

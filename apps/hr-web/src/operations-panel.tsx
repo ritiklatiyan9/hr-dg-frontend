@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import {
   AttendanceReviewDocument,
+  AttendanceDayDocument,
   OperationsDocument,
   OperateDocument,
   EmployeesDocument,
@@ -839,24 +840,53 @@ export function OperationsPanel({
   // whole-workspace snapshot so the desk renders without waiting on it.
   const navigate = useNavigate();
   const reviewOnly = initialTab === "review";
+  const attendanceOnly = initialTab === "attendance";
+  const [attendanceDay, setAttendanceDay] = useState(s.workDate);
+  const [attendanceEmployee, setAttendanceEmployee] = useState("");
+  const [attendanceOffset, setAttendanceOffset] = useState(0);
+  const [attendancePeople, setAttendancePeople] = useState<
+    { id: string; name: string }[]
+  >([]);
+  const attendanceQ = useScopedQuery<{
+    attendanceDay: Snapshot & {
+      people: { id: string; name: string }[];
+      timezone: string;
+      hasMore: boolean;
+      peopleTruncated: boolean;
+    };
+  }>(
+    ["attendance-day", attendanceDay, attendanceEmployee, attendanceOffset],
+    AttendanceDayDocument,
+    {
+      workDate: attendanceDay,
+      employeeId: attendanceEmployee || null,
+      offset: attendanceOffset,
+    },
+    attendanceOnly,
+    attendanceDay === s.workDate ? 15000 : undefined,
+  );
+  useEffect(() => {
+    if (attendanceQ.data)
+      setAttendancePeople(attendanceQ.data.attendanceDay.people);
+  }, [attendanceQ.data]);
   const q = useScopedQuery<{ operations: Snapshot }>(
     ["operations"],
     OperationsDocument,
     {},
-    !reviewOnly,
+    !reviewOnly && !attendanceOnly,
     15000,
   );
   const people = useScopedQuery<any>(
     ["operation-people"],
     EmployeesDocument,
     { first: 50 },
-    can("employees.view") && !reviewOnly,
+    can("employees.view") && !reviewOnly && !attendanceOnly,
   );
   const setup = useScopedQuery<any>(
     ["foundation"],
     FoundationDocument,
     {},
-    can("site_settings.view") && !reviewOnly,
+    can("site_settings.view") && !reviewOnly && !attendanceOnly,
   );
   const [tab, setTab] = useState(initialTab),
     [reviewDay, setReviewDay] = useState(s.workDate),
@@ -894,6 +924,10 @@ export function OperationsPanel({
     setAttendanceReview(null);
     setPhotoPreview(null);
     setReviewDay(s.workDate);
+    setAttendanceDay(s.workDate);
+    setAttendanceEmployee("");
+    setAttendancePeople([]);
+    setAttendanceOffset(0);
     setReviewFilter("pending");
     setSelectedReviewId(null);
   }, [s.actorId, s.siteId, s.version, s.workDate]);
@@ -906,11 +940,15 @@ export function OperationsPanel({
     15000,
   );
   const reviewData = reviewQ.data?.attendanceReview ?? null;
-  const data = q.data?.operations ?? (reviewOnly ? emptySnapshot : undefined),
-    employees = (people.data?.employees?.nodes ?? []).map((e: any) => ({
-      id: e.id,
-      name: e.displayName,
-    })),
+  const data = attendanceOnly
+      ? (attendanceQ.data?.attendanceDay ?? emptySnapshot)
+      : (q.data?.operations ?? (reviewOnly ? emptySnapshot : undefined)),
+    employees = attendanceOnly
+      ? (attendanceQ.data?.attendanceDay.people ?? attendancePeople)
+      : (people.data?.employees?.nodes ?? []).map((e: any) => ({
+          id: e.id,
+          name: e.displayName,
+        })),
     approvers = (data?.approvers ?? []).map((e: any) => ({
       id: e.id,
       name: e.name,
@@ -1045,9 +1083,9 @@ export function OperationsPanel({
     fixed?: Row,
     transform?: (v: Row) => Row,
   ) => setForm({ title, op, fields: items, fixed, transform });
-  if (q.isPending && !reviewOnly)
+  if (q.isPending && !reviewOnly && !attendanceOnly)
     return <PageSkeleton title={title ?? "Your working day"} />;
-  if (q.error && !reviewOnly)
+  if (q.error && !reviewOnly && !attendanceOnly)
     return <ErrorState error={q.error} retry={() => void q.refetch()} />;
   if (!data) return null;
   const open = data.sessions.find(
@@ -1398,9 +1436,28 @@ export function OperationsPanel({
           )}
         </>
       )}
+      {tab === "attendance" && attendanceQ.error && (
+        <Notice>{attendanceQ.error.message}</Notice>
+      )}
       {tab === "attendance" && (
         <AttendanceRecordsDesk
           siteName={s.siteName}
+          workDate={attendanceOnly ? attendanceDay : undefined}
+          timezone={attendanceQ.data?.attendanceDay.timezone}
+          employeeId={attendanceEmployee}
+          employees={employees}
+          onDateChange={(day) => {
+            setAttendanceDay(day);
+            setAttendanceOffset(0);
+          }}
+          onEmployeeChange={(employee) => {
+            setAttendanceEmployee(employee);
+            setAttendanceOffset(0);
+          }}
+          offset={attendanceOffset}
+          hasMore={attendanceQ.data?.attendanceDay.hasMore ?? false}
+          onPageChange={setAttendanceOffset}
+          peopleTruncated={attendanceQ.data?.attendanceDay.peopleTruncated}
           sessions={data.sessions}
           maxSessionHours={data.policy?.rules?.maxSessionHours}
           events={data.events}
@@ -1408,8 +1465,10 @@ export function OperationsPanel({
           visits={data.visits}
           me={data.me}
           name={name}
-          fetching={q.isFetching}
-          onRefresh={() => void q.refetch()}
+          fetching={attendanceOnly ? attendanceQ.isFetching : q.isFetching}
+          onRefresh={() =>
+            void (attendanceOnly ? attendanceQ.refetch() : q.refetch())
+          }
           canAssignShift={can("attendance.edit")}
           onAssignShift={() => setSchedule(true)}
           onOpenApprovals={() => navigate("/attendance-review")}

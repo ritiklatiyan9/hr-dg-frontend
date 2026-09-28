@@ -75,7 +75,6 @@ export function DwrPanel() {
   const t = useT(),
     s = useScope();
   const home = useChatHome();
-  const reports = useScopedQuery<any>(["dwr"], DwrDocument, {}, true, 15000);
   const canGroups =
     s.capabilities.includes("dwr_groups.view") ||
     s.capabilities.includes("dwr_groups.create");
@@ -90,6 +89,14 @@ export function DwrPanel() {
     ],
     "chats",
   );
+  const needsReports = tab === "reports" || tab === "settings";
+  const reports = useScopedQuery<any>(
+    ["dwr"],
+    DwrDocument,
+    {},
+    needsReports,
+    30000,
+  );
   const [report, setReport] = useState<ReportTarget | null>(null),
     [group, setGroup] = useState<string | null>(null),
     [creating, setCreating] = useState(false),
@@ -97,11 +104,11 @@ export function DwrPanel() {
       key: 0,
       id: null,
     });
-  if (home.isPending || reports.isPending)
+  if (home.isPending)
     return (
       <PageSkeleton title={t("Daily work reports", "दैनिक कार्य रिपोर्ट")} />
     );
-  if (home.error || reports.error)
+  if (home.error)
     return (
       <ErrorState
         error={(home.error ?? reports.error)!}
@@ -112,7 +119,7 @@ export function DwrPanel() {
       />
     );
   const h = home.data!.dwrChat,
-    d = reports.data.dwr;
+    d = reports.data?.dwr;
   const create = h.permissions.createGroups
     ? () => setCreating(true)
     : undefined;
@@ -179,7 +186,16 @@ export function DwrPanel() {
           />
         </TabsContent>
         <TabsContent value="reports" className="mt-2">
-          <ReportsTab data={d} open={setReport} />
+          {d ? (
+            <ReportsTab data={d} open={setReport} />
+          ) : reports.error ? (
+            <ErrorState
+              error={reports.error}
+              retry={() => void reports.refetch()}
+            />
+          ) : (
+            <PageSkeleton title="Reports" />
+          )}
         </TabsContent>
         {canGroups && (
           <TabsContent value="groups" className="mt-2">
@@ -195,7 +211,16 @@ export function DwrPanel() {
         )}
         {canSettings && (
           <TabsContent value="settings" className="mt-2">
-            <SettingsTab settings={d.settings} agent={h.agent} />
+            {d ? (
+              <SettingsTab settings={d.settings} agent={h.agent} />
+            ) : reports.error ? (
+              <ErrorState
+                error={reports.error}
+                retry={() => void reports.refetch()}
+              />
+            ) : (
+              <PageSkeleton title="DWR settings" />
+            )}
           </TabsContent>
         )}
       </Tabs>
@@ -394,8 +419,8 @@ function SettingsTab({ settings, agent }: { settings: any; agent: Agent }) {
               <code>OPENROUTER_API_KEY</code>, <code>OPENROUTER_DWR_MODEL</code>{" "}
               {t("(optional", "(वैकल्पिक")} <code>OPENROUTER_DWR_PROVIDER</code>
               , <code>DWR_AGENT_USER_DAILY_CALLS</code>,{" "}
-              <code>DWR_AGENT_ORG_DAILY_CALLS</code>).
-              {" "}{t("Or select Groq with", "या Groq चुनें:")}{" "}
+              <code>DWR_AGENT_ORG_DAILY_CALLS</code>).{" "}
+              {t("Or select Groq with", "या Groq चुनें:")}{" "}
               <code>DWR_AI_PROVIDER=groq</code>, <code>GROQ_API_KEY</code>,{" "}
               <code>GROQ_DWR_MODEL</code>.
             </p>
