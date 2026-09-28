@@ -34,7 +34,7 @@ import {
 import { ApiError, rest } from "./api";
 import { Button } from "./components/ui/button";
 import "./app.css";
-type AuthState = "loading" | "login" | "mfa" | "ready";
+type AuthState = "loading" | "login" | "mfa" | "ready" | "unavailable";
 function AuthTools() {
   const p = useContext(Preferences);
   return (
@@ -337,13 +337,22 @@ function App() {
     [enroll, setEnroll] = useState(false);
   const [signOutError, setSignOutError] = useState("");
   const client = useQueryClient();
-  useEffect(() => {
+  function checkSession() {
     rest<{ mfaRequired: boolean; enrollmentRequired: boolean }>("/auth/session")
       .then((r) => {
         setEnroll(r.enrollmentRequired);
         setAuth(r.mfaRequired ? "mfa" : "ready");
       })
-      .catch(() => setAuth("login"));
+      .catch((error) =>
+        setAuth(
+          error instanceof ApiError && error.code === "UNAUTHENTICATED"
+            ? "login"
+            : "unavailable",
+        ),
+      );
+  }
+  useEffect(() => {
+    checkSession();
   }, []);
   async function logout() {
     setSignOutError("");
@@ -362,6 +371,21 @@ function App() {
     setAuth("login");
   }
   if (auth === "loading") return <Busy />;
+  if (auth === "unavailable")
+    return (
+      <div className="center-page">
+        <Notice>The HR service is temporarily unavailable. Try again.</Notice>
+        <Button
+          variant="outline"
+          onClick={() => {
+            setAuth("loading");
+            checkSession();
+          }}
+        >
+          Try again
+        </Button>
+      </div>
+    );
   if (auth === "login")
     return (
       <Login
@@ -395,7 +419,7 @@ const client = new QueryClient({
     queries: {
       retry: false,
       staleTime: 30_000,
-      refetchOnWindowFocus: true,
+      refetchOnWindowFocus: false,
       gcTime: 300_000,
     },
   },

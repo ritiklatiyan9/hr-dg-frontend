@@ -65,7 +65,7 @@ import {
   type BootstrapQuery,
   type SiteScopeQuery,
 } from "@/shared/contracts/generated";
-import { gql } from "./api";
+import { gql, isTransientFailure } from "./api";
 import { ScopeBoundary, scopeKey } from "./scope";
 import { ScopeContext } from "./workspace-context";
 const InboxPanel = lazy(() =>
@@ -130,6 +130,7 @@ import {
   Badge,
   Empty,
   ErrorState,
+  Notice,
   OnlineStatus,
   Preferences,
   Skeleton,
@@ -169,9 +170,10 @@ function WorkspaceBody({ onLogout }: { onLogout: () => Promise<void> }) {
   const boot = useQuery({
     queryKey: ["bootstrap"],
     queryFn: ({ signal }) => gql<BootstrapQuery>(BootstrapDocument, {}, signal),
-    retry: false,
-    refetchOnWindowFocus: true,
-    refetchInterval: 15000,
+    retry: (attempt, error) => attempt < 1 && isTransientFailure(error),
+    retryDelay: 750,
+    refetchOnWindowFocus: false,
+    refetchInterval: 60_000,
   });
   const b = boot.data?.bootstrap,
     key = b
@@ -201,7 +203,8 @@ function WorkspaceBody({ onLogout }: { onLogout: () => Promise<void> }) {
         ticket.release();
       }
     },
-    retry: false,
+    retry: (attempt, error) => attempt < 1 && isTransientFailure(error),
+    retryDelay: 750,
   });
   function clearScoped() {
     boundary.change();
@@ -250,8 +253,8 @@ function WorkspaceBody({ onLogout }: { onLogout: () => Promise<void> }) {
     return () => document.removeEventListener("visibilitychange", revalidate);
   }, []);
   useEffect(() => {
-    if (boot.error) clearScoped();
-  }, [boot.error]);
+    if (boot.error && (!b || !isTransientFailure(boot.error))) clearScoped();
+  }, [boot.error, b]);
   async function switchSite(next: string) {
     if (next === siteId || !b?.sites.some((s) => s.id === next)) return;
     clearScoped();
@@ -268,7 +271,7 @@ function WorkspaceBody({ onLogout }: { onLogout: () => Promise<void> }) {
         <Skeleton />
       </div>
     );
-  if (boot.error)
+  if (boot.error && (!b || !isTransientFailure(boot.error)))
     return (
       <div className="center-page">
         <ErrorState error={boot.error} retry={() => void boot.refetch()} />
@@ -914,6 +917,12 @@ function WorkspaceBody({ onLogout }: { onLogout: () => Promise<void> }) {
           </div>
         </header>
         <OnlineStatus />
+        {((boot.error && b && isTransientFailure(boot.error)) ||
+          (scope.error && scope.data && isTransientFailure(scope.error))) && (
+          <Notice>
+            The HR service is responding slowly. Showing the last verified view.
+          </Notice>
+        )}
         <main id="main-content" tabIndex={-1}>
           {!siteId || !selected ? (
             <>
@@ -967,7 +976,7 @@ function WorkspaceBody({ onLogout }: { onLogout: () => Promise<void> }) {
             </>
           ) : checking || scope.isPending ? (
             <Skeleton />
-          ) : scope.error ? (
+          ) : scope.error && (!scope.data || !isTransientFailure(scope.error)) ? (
             <ErrorState error={scope.error} retry={reload} />
           ) : !canPage ? (
             <Empty

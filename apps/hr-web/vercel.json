@@ -2,7 +2,19 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "vite",
   "outputDirectory": "dist",
-  "proxy": { "entrypoint": "proxy.js" },
+  "proxy": {
+    "entrypoint": "proxy.js",
+    "matcher": [
+      "/analytics/:path*",
+      "/auth/:path*",
+      "/dwr/:path*",
+      "/files/:path*",
+      "/graphql",
+      "/health/:path*",
+      "/payroll/:path*",
+      "/profile/:path*"
+    ]
+  },
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]

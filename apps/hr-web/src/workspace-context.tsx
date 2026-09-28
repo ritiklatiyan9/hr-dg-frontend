@@ -3,7 +3,7 @@ import { createContext, useContext } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DocumentNode } from "graphql";
 import type { SiteScopeQuery } from "@/shared/contracts/generated";
-import { gql } from "./api";
+import { gql, isTransientFailure } from "./api";
 import { ScopeBoundary } from "./scope";
 export interface WorkspaceScope {
   sites: { id: string; name: string }[];
@@ -33,7 +33,7 @@ export function useScopedQuery<T>(
   interval?: number,
 ) {
   const s = useScope();
-  return useQuery({
+  const query = useQuery({
     queryKey: [...s.key, ...suffix],
     enabled,
     queryFn: async ({ signal }) => {
@@ -54,10 +54,23 @@ export function useScopedQuery<T>(
     },
     staleTime: suffix[0] === "foundation" ? 120_000 : 30_000,
     gcTime: 300_000,
-    retry: false,
-    refetchOnWindowFocus: true,
+    retry: (attempt, error) => attempt < 1 && isTransientFailure(error),
+    retryDelay: 750,
+    refetchOnWindowFocus: false,
     refetchInterval: interval,
   });
+  // Keep already verified records visible through a transient proxy failure.
+  // Access failures are never masked and are handled by the scope boundary.
+  if (query.data !== undefined && isTransientFailure(query.error))
+    return {
+      ...query,
+      error: null,
+      status: "success" as const,
+      isError: false,
+      isSuccess: true,
+      isRefetchError: false,
+    } as typeof query;
+  return query;
 }
 export function useWrite() {
   const scope = useScope();

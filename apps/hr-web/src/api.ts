@@ -3,8 +3,53 @@ export class ApiError extends Error {
   constructor(
     public code: string,
     message: string,
+    public status?: number,
   ) {
     super(message);
+  }
+}
+export const isAccessFailure = (error: unknown) =>
+  error instanceof ApiError &&
+  ["UNAUTHENTICATED", "MFA_REQUIRED", "SCOPE_CHANGED", "FORBIDDEN"].includes(
+    error.code,
+  );
+export const isTransientFailure = (error: unknown) =>
+  error instanceof ApiError &&
+  !isAccessFailure(error) &&
+  ([
+    "NETWORK_ERROR",
+    "UPSTREAM_UNAVAILABLE",
+    "INTERNAL_ERROR",
+    "INTERNAL_SERVER_ERROR",
+    "SERVICE_UNAVAILABLE",
+  ].includes(error.code) ||
+    (error.status !== undefined && error.status >= 500));
+async function request(input: string, init: RequestInit) {
+  try {
+    return await fetch(input, init);
+  } catch (error) {
+    if (
+      init.signal?.aborted ||
+      (error instanceof DOMException && error.name === "AbortError")
+    )
+      throw error;
+    throw new ApiError(
+      "NETWORK_ERROR",
+      "The HR service is temporarily unreachable. Try again.",
+    );
+  }
+}
+async function responseJson(response: Response): Promise<any> {
+  try {
+    return await response.json();
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError")
+      throw error;
+    throw new ApiError(
+      "NETWORK_ERROR",
+      "The HR service returned an unexpected response. Try again.",
+      response.status,
+    );
   }
 }
 const csrf = () =>
@@ -17,7 +62,7 @@ const csrf = () =>
       .join("=") ?? "",
   );
 export async function rest<T>(path: string, body?: unknown): Promise<T> {
-  const r = await fetch(path, {
+  const r = await request(path, {
     method: body === undefined ? "GET" : "POST",
     credentials: "same-origin",
     headers: {
@@ -27,11 +72,12 @@ export async function rest<T>(path: string, body?: unknown): Promise<T> {
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  const json = await r.json();
+  const json = await responseJson(r);
   if (!r.ok)
     throw new ApiError(
       json.code ?? "NETWORK_ERROR",
       json.message ?? "Request failed",
+      r.status,
     );
   return json;
 }
@@ -41,7 +87,7 @@ export async function gql<T>(
   signal?: AbortSignal,
   version?: number,
 ): Promise<T> {
-  const r = await fetch("/graphql", {
+  const r = await request("/graphql", {
     method: "POST",
     credentials: "same-origin",
     signal,
@@ -54,7 +100,7 @@ export async function gql<T>(
     },
     body: JSON.stringify({ query: print(document), variables }),
   });
-  const json = await r.json();
+  const json = await responseJson(r);
   if (!r.ok || json.errors?.length) {
     const code =
       json.errors?.[0]?.extensions?.code ?? json.code ?? "NETWORK_ERROR";
@@ -68,12 +114,13 @@ export async function gql<T>(
     throw new ApiError(
       code,
       json.errors?.[0]?.message ?? json.message ?? "Request failed",
+      r.status,
     );
   }
   return json.data;
 }
 export async function uploadEvidence(siteId: string, id: string, file: Blob) {
-  const response = await fetch(
+  const response = await request(
     `/files/intents/${id}/content?siteId=${encodeURIComponent(siteId)}`,
     {
       method: "POST",
@@ -85,11 +132,12 @@ export async function uploadEvidence(siteId: string, id: string, file: Blob) {
       body: file,
     },
   );
-  const result = await response.json();
+  const result = await responseJson(response);
   if (!response.ok)
     throw new ApiError(
       result.code ?? "UPLOAD_FAILED",
       result.message ?? "Photo upload failed",
+      response.status,
     );
   return result as { id: string; status: string; scanResult: string };
 }

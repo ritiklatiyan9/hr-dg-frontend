@@ -46,7 +46,20 @@ export default async function proxy(request) {
       statusText: upstream.statusText,
       headers: responseHeaders,
     });
-  } catch {
-    return new Response("Backend unavailable", { status: 502 });
+  } catch (error) {
+    console.error("HR upstream unavailable", {
+      name: error instanceof Error ? error.name : "Unknown",
+      code: error?.cause?.code ?? undefined,
+    });
+    return Response.json(
+      {
+        code: "UPSTREAM_UNAVAILABLE",
+        message: "The HR service is temporarily unavailable. Try again.",
+      },
+      {
+        status: 502,
+        headers: { "cache-control": "no-store", "retry-after": "3" },
+      },
+    );
   }
 }
