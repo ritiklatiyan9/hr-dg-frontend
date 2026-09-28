@@ -1,0 +1,393 @@
+query Bootstrap {
+  bootstrap {
+    organization {
+      id
+      name
+    }
+    actor {
+      id
+      permissionVersion
+    }
+    sites {
+      id
+      name
+      timezone
+    }
+  }
+}
+query SiteScope($siteId: ID!) {
+  scope(siteId: $siteId) {
+    site {
+      id
+      name
+      timezone
+    }
+    modules {
+      id
+      name
+      hindi
+      group
+      phase
+      available
+      actions
+      fields
+      dependencies
+    }
+    decisions {
+      key
+      decision {
+        ...DecisionFields
+      }
+    }
+    capabilities
+    workDate
+  }
+}
+fragment PersonalFields on EmployeePersonal {
+  dateOfBirth
+  gender
+  bloodGroup
+  personalEmail
+  address
+  permanentAddress
+  emergencyName
+  emergencyRelation
+  emergencyPhone
+}
+fragment EmployeeFields on Employee {
+  userId
+  allowedActions
+  permittedFields
+  salary
+  bank
+  identity
+  id
+  employeeCode
+  displayName
+  workEmail
+  phone
+  personal {
+    ...PersonalFields
+  }
+  photoUpdatedAt
+  jobTitle
+  department
+  version
+  isSelf
+  employment {
+    id
+    startsOn
+    endsOn
+    legalEmployer {
+      id
+      name
+    }
+  }
+  assignments {
+    id
+    startsOn
+    endsOn
+    site {
+      id
+      name
+      timezone
+    }
+  }
+}
+query Employees(
+  $siteId: ID!
+  $first: Int
+  $after: String
+  $search: String
+  $department: String
+  $status: String
+) {
+  employees(
+    siteId: $siteId
+    first: $first
+    after: $after
+    search: $search
+    department: $department
+    status: $status
+  ) {
+    nodes {
+      ...EmployeeFields
+      ...EmployeeAdminFields
+    }
+    endCursor
+    hasNextPage
+  }
+}
+fragment EmployeeAdminFields on Employee {
+  status
+  login {
+    status
+    loginId
+    lastSignInAt
+    devices
+    protected
+  }
+}
+query EmployeeRecord($siteId: ID!, $id: ID!) {
+  employee(siteId: $siteId, id: $id) {
+    ...EmployeeFields
+    ...EmployeeAdminFields
+  }
+}
+query MyProfile($siteId: ID!) {
+  myProfile(siteId: $siteId) {
+    ...EmployeeFields
+  }
+}
+mutation UpdateProfile($siteId: ID!, $input: UpdateProfileInput!) {
+  updateProfile(siteId: $siteId, input: $input) {
+    ...EmployeeFields
+  }
+}
+
+fragment DecisionFields on AccessDecision {
+  allowed
+  scope
+  rule
+  available
+}
+fragment ChangeFields on PermissionChange {
+  key
+  before {
+    ...DecisionFields
+  }
+  after {
+    ...DecisionFields
+  }
+}
+query AccessUsers($siteId: ID!, $search: String) {
+  accessUsers(siteId: $siteId, search: $search) {
+    users {
+      id
+      name
+      email
+      active
+      version
+      protected
+    }
+    isSuperAdmin
+    canManage
+  }
+}
+query UserAccess($siteId: ID!, $userId: ID!) {
+  userAccess(siteId: $siteId, userId: $userId) {
+    id
+    name
+    email
+    active
+    role
+    version
+    protected
+    sites {
+      id
+      name
+      active
+    }
+    rules {
+      key
+      effect
+      scope
+    }
+    delegations {
+      key
+      scope
+    }
+    effective {
+      key
+      decision {
+        ...DecisionFields
+      }
+    }
+    audit {
+      id
+      actorId
+      createdAt
+      reason
+      version
+      changes {
+        ...ChangeFields
+      }
+    }
+  }
+}
+mutation PreviewAccess($siteId: ID!, $userId: ID!, $input: AccessChangeInput!) {
+  previewAccess(siteId: $siteId, userId: $userId, input: $input) {
+    version
+    changes {
+      ...ChangeFields
+    }
+  }
+}
+mutation SaveAccess($siteId: ID!, $userId: ID!, $input: AccessChangeInput!) {
+  saveAccess(siteId: $siteId, userId: $userId, input: $input) {
+    version
+    changes {
+      ...ChangeFields
+    }
+  }
+}
+query Foundation($siteId: ID!) {
+  foundation(siteId: $siteId) {
+    settings {
+      id
+      name
+      timezone
+      weekStart
+      contactEmail
+      version
+    }
+    references {
+      id
+      kind
+      name
+      active
+      version
+      startTime
+      endTime
+      date
+    }
+    employers {
+      id
+      name
+    }
+    managers {
+      id
+      name
+    }
+    drafts {
+      id
+      displayName
+      employeeCode
+      workEmail
+      department
+      designation
+      startsOn
+      status
+      version
+      authorId
+      createdAt
+    }
+  }
+}
+query ProfileRequests($siteId: ID!) {
+  profileRequests(siteId: $siteId) {
+    id
+    employeeId
+    employeeName
+    phone
+    reason
+    status
+    version
+    createdAt
+    reviewNote
+    isSelf
+    details {
+      ...PersonalFields
+    }
+    hasPhoto
+    currentPhone
+    currentDetails {
+      ...PersonalFields
+    }
+  }
+}
+query EmployeeDetails($siteId: ID!, $employeeId: ID!) {
+  employeeDetails(siteId: $siteId, employeeId: $employeeId) {
+    reporting {
+      id
+      managerId
+      managerName
+      startsOn
+      endsOn
+    }
+    shift {
+      id
+      name
+      startTime
+      endTime
+    }
+  }
+}
+mutation SaveFoundation(
+  $siteId: ID!
+  $operation: String!
+  $input: FoundationInput!
+) {
+  saveFoundation(siteId: $siteId, operation: $operation, input: $input) {
+    id
+    version
+    status
+  }
+}
+query OrganizationReport($siteId: ID!) {
+  organizationReport(siteId: $siteId) {
+    readOnly
+    rule
+    sites {
+      id
+      name
+      timezone
+      employees
+    }
+  }
+}
+query AuditHistory($siteId: ID!) {
+  auditHistory(siteId: $siteId) {
+    id
+    actorId
+    action
+    entityId
+    createdAt
+    reason
+  }
+}
+mutation QueueExport($siteId: ID!, $fields: [String!]!) {
+  queueExport(siteId: $siteId, fields: $fields) {
+    id
+    status
+  }
+}
+query ExportJob($siteId: ID!, $id: ID!) {
+  exportJob(siteId: $siteId, id: $id) {
+    id
+    status
+    expiresAt
+  }
+}
+
+query Operations($siteId: ID!) { operations(siteId: $siteId) }
+query AttendanceReview($siteId: ID!, $workDate: String!) { attendanceReview(siteId: $siteId, workDate: $workDate) }
+mutation Operate($siteId: ID!, $operation: String!, $input: JSON!) { operate(siteId: $siteId, operation: $operation, input: $input) }
+query Dwr($siteId: ID!, $workDate: String) { dwr(siteId: $siteId, workDate: $workDate) }
+query DwrChat($siteId: ID!, $input: JSON!) { dwrChat(siteId: $siteId, input: $input) }
+mutation DwrCommand($siteId: ID!, $operation: String!, $input: JSON!) { dwrCommand(siteId: $siteId, operation: $operation, input: $input) }
+query Payroll($siteId: ID!, $input: JSON) { payroll(siteId: $siteId, input: $input) }
+query HrRecords($siteId: ID!, $kind: String!) { hrRecords(siteId: $siteId,kind: $kind) }
+mutation PayrollCommand($siteId: ID!, $operation: String!, $input: JSON!) { payrollCommand(siteId:$siteId,operation:$operation,input:$input) }
+mutation HrCommand($siteId: ID!, $operation: String!, $input: JSON!) { hrCommand(siteId:$siteId,operation:$operation,input:$input) }
+query ApprovalQueue($siteId:ID!){approvalQueue(siteId:$siteId)}
+query Dashboard($siteId: ID!) { dashboard(siteId: $siteId) }
+query EmployeeLookup($siteId: ID!, $search: String!) { employeeLookup(siteId: $siteId, search: $search) }
+query Analytics($siteId:ID!,$input:JSON!){analytics(siteId:$siteId,input:$input)}
+mutation ExplainAnalytics($siteId:ID!,$input:JSON!){explainAnalytics(siteId:$siteId,input:$input)}
+
+query TrackingContext($siteId: ID!) { trackingContext(siteId: $siteId) }
+query TrackingMonitor($siteId: ID!, $input: JSON!) { trackingMonitor(siteId: $siteId, input: $input) }
+query RoleMatrix($siteId: ID!) { roleMatrix(siteId: $siteId) }
+mutation TrackingCommand($siteId: ID!, $operation: String!, $input: JSON!) { trackingCommand(siteId: $siteId, operation: $operation, input: $input) }
+mutation EmployeeLifecycle(
+  $siteId: ID!
+  $operation: String!
+  $input: EmployeeLifecycleInput!
+) {
+  employeeLifecycle(siteId: $siteId, operation: $operation, input: $input) {
+    id
+    version
+    password
+  }
+}

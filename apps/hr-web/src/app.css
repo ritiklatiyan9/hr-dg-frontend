@@ -1,0 +1,52 @@
+/* Legacy panel CSS sits in its own layer: above Tailwind's preflight, below
+   utilities, so shadcn components compose with utilities while every existing
+   screen keeps its look. The semantic tokens already use shadcn's names. */
+@layer theme, base, legacy, components, utilities;
+@import "tailwindcss";
+@import "./styles.css" layer(legacy);
+@import "./design-system.css" layer(legacy);
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--foreground);
+  --color-destructive: var(--danger);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --animate-fade-in: dg-fade-in 150ms ease-out;
+  --animate-sheet-in: dg-sheet-in 200ms ease-out;
+}
+@keyframes dg-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes dg-sheet-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+}

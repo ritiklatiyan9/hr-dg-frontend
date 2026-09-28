@@ -1,0 +1,421 @@
+"An ISO-8601 UTC instant; calendar dates use YYYY-MM-DD strings."
+scalar DateTime
+"Exact decimal encoded as a string. Never a binary floating-point currency."
+scalar Decimal
+type Organization {
+  id: ID!
+  name: String!
+}
+type Actor {
+  id: ID!
+  permissionVersion: Int!
+}
+type Site {
+  id: ID!
+  name: String!
+  timezone: String!
+}
+type Bootstrap {
+  organization: Organization!
+  actor: Actor!
+  sites: [Site!]!
+}
+type Scope {
+  site: Site!
+  capabilities: [String!]!
+  decisions: [EffectivePermission!]!
+  modules: [ProductModule!]!
+  workDate: String!
+}
+type LegalEmployer {
+  id: ID!
+  name: String!
+}
+type Employment {
+  id: ID!
+  startsOn: String!
+  endsOn: String
+  legalEmployer: LegalEmployer!
+}
+type SiteAssignment {
+  id: ID!
+  startsOn: String!
+  endsOn: String
+  site: Site!
+}
+type Employee {
+  userId: ID
+  salary: Decimal
+  bank: String
+  identity: String
+  permittedFields: [String!]!
+  allowedActions: [String!]!
+  id: ID!
+  employeeCode: String!
+  displayName: String!
+  workEmail: String
+  phone: String
+  personal: EmployeePersonal
+  photoUpdatedAt: DateTime
+  jobTitle: String
+  department: String
+  version: Int!
+  isSelf: Boolean!
+  "active | joining | moved | former at the selected site; null without the employment field."
+  status: String
+  "Null unless the actor may manage this employee's account."
+  login: EmployeeLogin
+  employment: [Employment!]!
+  assignments: [SiteAssignment!]!
+}
+type EmployeeLogin {
+  "none | pending | active | disabled"
+  status: String!
+  loginId: String
+  lastSignInAt: DateTime
+  devices: Int!
+  "Privileged accounts are managed through Users & access, never here."
+  protected: Boolean!
+}
+type EmployeePersonal {
+  dateOfBirth: String
+  gender: String
+  bloodGroup: String
+  personalEmail: String
+  address: String
+  permanentAddress: String
+  emergencyName: String
+  emergencyRelation: String
+  emergencyPhone: String
+}
+type EmployeePage {
+  nodes: [Employee!]!
+  endCursor: String
+  hasNextPage: Boolean!
+}
+input UpdateProfileInput {
+  employeeId: ID!
+  phone: String!
+  expectedVersion: Int!
+}
+type Query {
+  bootstrap: Bootstrap!
+  scope(siteId: ID!): Scope!
+  employees(
+    siteId: ID!
+    first: Int = 20
+    after: String
+    search: String
+    department: String
+    "current (default) | former | all"
+    status: String
+  ): EmployeePage!
+  employee(siteId: ID!, id: ID!): Employee
+  myProfile(siteId: ID!): Employee
+}
+type Mutation {
+  updateProfile(siteId: ID!, input: UpdateProfileInput!): Employee!
+}
+
+type ProductModule {
+  id: ID!
+  name: String!
+  hindi: String!
+  group: String!
+  phase: Int!
+  available: Boolean!
+  actions: [String!]!
+  fields: [String!]!
+  dependencies: [String!]!
+}
+type AccessDecision {
+  allowed: Boolean!
+  scope: String!
+  rule: String!
+  available: Boolean
+}
+type EffectivePermission {
+  key: String!
+  decision: AccessDecision!
+}
+type AccessRule {
+  key: String!
+  effect: String!
+  scope: String!
+}
+type Delegation {
+  key: String!
+  scope: String!
+}
+type UserSite {
+  id: ID!
+  name: String!
+  active: Boolean!
+}
+type AccessUser {
+  id: ID!
+  name: String!
+  email: String!
+  active: Boolean!
+  version: Int!
+  protected: Boolean!
+}
+type AccessUsers {
+  users: [AccessUser!]!
+  isSuperAdmin: Boolean!
+  canManage: Boolean!
+}
+type PermissionChange {
+  key: String!
+  before: AccessDecision!
+  after: AccessDecision!
+}
+type AccessAudit {
+  id: ID!
+  actorId: ID!
+  createdAt: DateTime!
+  reason: String!
+  version: Int!
+  changes: [PermissionChange!]!
+}
+type UserAccess {
+  id: ID!
+  name: String!
+  email: String!
+  active: Boolean!
+  role: String!
+  version: Int!
+  protected: Boolean!
+  sites: [UserSite!]!
+  rules: [AccessRule!]!
+  delegations: [Delegation!]!
+  effective: [EffectivePermission!]!
+  audit: [AccessAudit!]!
+}
+type AccessChangeResult {
+  version: Int!
+  changes: [PermissionChange!]!
+}
+input AccessRuleInput {
+  key: String!
+  effect: String!
+  scope: String!
+}
+input DelegationInput {
+  key: String!
+  scope: String!
+}
+input AccessChangeInput {
+  expectedVersion: Int!
+  role: String!
+  active: Boolean!
+  rules: [AccessRuleInput!]!
+  delegations: [DelegationInput!]!
+  reason: String
+}
+type SiteSettings {
+  id: ID!
+  name: String!
+  timezone: String!
+  weekStart: Int!
+  contactEmail: String!
+  version: Int!
+}
+type ReferenceItem {
+  id: ID!
+  kind: String!
+  name: String!
+  active: Boolean!
+  version: Int!
+  startTime: String
+  endTime: String
+  date: String
+}
+type ManagerOption {
+  id: ID!
+  name: String!
+}
+type EmployeeDraft {
+  id: ID!
+  displayName: String!
+  employeeCode: String!
+  workEmail: String!
+  department: String!
+  designation: String!
+  startsOn: String!
+  status: String!
+  version: Int!
+  authorId: ID!
+  createdAt: DateTime!
+}
+type FoundationData {
+  settings: SiteSettings!
+  references: [ReferenceItem!]!
+  employers: [LegalEmployer!]!
+  managers: [ManagerOption!]!
+  drafts: [EmployeeDraft!]!
+}
+type ProfileRequest {
+  id: ID!
+  employeeId: ID!
+  employeeName: String!
+  phone: String!
+  reason: String!
+  status: String!
+  version: Int!
+  createdAt: DateTime!
+  reviewNote: String
+  isSelf: Boolean!
+  details: EmployeePersonal
+  hasPhoto: Boolean!
+  currentPhone: String
+  currentDetails: EmployeePersonal
+}
+type ReportingAssignment {
+  id: ID!
+  managerId: ID!
+  managerName: String!
+  startsOn: String!
+  endsOn: String
+}
+type EmployeeShift {
+  id: ID!
+  name: String!
+  startTime: String
+  endTime: String
+}
+type EmployeeDetails {
+  reporting: [ReportingAssignment!]!
+  shift: EmployeeShift
+}
+input FoundationInput {
+  id: ID
+  employeeId: ID
+  expectedVersion: Int
+  employeeCode: String
+  displayName: String
+  workEmail: String
+  department: String
+  designation: String
+  phone: String
+  legalEmployerId: ID
+  startsOn: String
+  endsOn: String
+  sourceSiteId: ID
+  assignmentId: ID
+  managerId: ID
+  shiftId: ID
+  kind: String
+  name: String
+  startTime: String
+  endTime: String
+  date: String
+  active: Boolean
+  approve: Boolean
+  note: String
+  reason: String
+  timezone: String
+  weekStart: Int
+  contactEmail: String
+  moduleId: ID
+  enabled: Boolean
+  draftId: ID
+}
+type FoundationResult {
+  id: ID
+  version: Int
+  status: String
+}
+type SiteReport {
+  id: ID!
+  name: String!
+  timezone: String!
+  employees: Int!
+}
+type OrganizationReport {
+  readOnly: Boolean!
+  sites: [SiteReport!]!
+  rule: String!
+}
+type AuditEntry {
+  id: ID!
+  actorId: ID!
+  action: String!
+  entityId: ID!
+  createdAt: DateTime!
+  reason: String
+}
+type ExportJob {
+  id: ID!
+  status: String!
+  expiresAt: DateTime
+}
+extend type Query {
+  accessUsers(siteId: ID!, search: String): AccessUsers!
+  userAccess(siteId: ID!, userId: ID!): UserAccess!
+  foundation(siteId: ID!): FoundationData!
+  profileRequests(siteId: ID!): [ProfileRequest!]!
+  employeeDetails(siteId: ID!, employeeId: ID!): EmployeeDetails!
+  organizationReport(siteId: ID!): OrganizationReport!
+  auditHistory(siteId: ID!): [AuditEntry!]!
+  exportJob(siteId: ID!, id: ID!): ExportJob!
+}
+extend type Mutation {
+  previewAccess(
+    siteId: ID!
+    userId: ID!
+    input: AccessChangeInput!
+  ): AccessChangeResult!
+  saveAccess(
+    siteId: ID!
+    userId: ID!
+    input: AccessChangeInput!
+  ): AccessChangeResult!
+  saveFoundation(
+    siteId: ID!
+    operation: String!
+    input: FoundationInput!
+  ): FoundationResult!
+  queueExport(siteId: ID!, fields: [String!]!): ExportJob!
+  "set_password | disable_login | enable_login | rehire"
+  employeeLifecycle(
+    siteId: ID!
+    operation: String!
+    input: EmployeeLifecycleInput!
+  ): EmployeeLifecycleResult!
+}
+input EmployeeLifecycleInput {
+  employeeId: ID!
+  expectedVersion: Int!
+  legalEmployerId: ID
+  startsOn: String
+  "set_password only: 8–128 characters; omitted generates one."
+  password: String
+}
+type EmployeeLifecycleResult {
+  id: ID!
+  version: Int!
+  "Temporary password, returned once by set_password."
+  password: String
+}
+
+# Versioned operation payloads are validated by strict server schemas. Never contain actor/org overrides.
+scalar JSON
+extend type Query { dwr(siteId: ID!, workDate: String): JSON! }
+# DWR chat views: home, thread (month), group, candidates, day, daySummary.
+extend type Query { dwrChat(siteId: ID!, input: JSON!): JSON! }
+extend type Mutation { dwrCommand(siteId: ID!, operation: String!, input: JSON!): JSON! }
+extend type Query { operations(siteId: ID!): JSON! }
+extend type Query { attendanceReview(siteId: ID!, workDate: String!): JSON! }
+extend type Mutation { operate(siteId: ID!, operation: String!, input: JSON!): JSON! }
+extend type Query { payroll(siteId: ID!, input: JSON): JSON! hrRecords(siteId: ID!, kind: String!): JSON! }
+extend type Mutation { payrollCommand(siteId: ID!, operation: String!, input: JSON!): JSON! hrCommand(siteId: ID!, operation: String!, input: JSON!): JSON! }
+extend type Query { approvalQueue(siteId: ID!): JSON! }
+extend type Query { dashboard(siteId: ID!): JSON! }
+extend type Query { employeeLookup(siteId: ID!, search: String!): JSON! }
+extend type Query { analytics(siteId: ID!,input: JSON!): JSON! }
+extend type Mutation { explainAnalytics(siteId: ID!,input: JSON!): JSON! }
+
+extend type Query { trackingContext(siteId: ID!): JSON! trackingMonitor(siteId: ID!, input: JSON!): JSON! }
+extend type Query { roleMatrix(siteId: ID!): JSON! }
+extend type Mutation { trackingCommand(siteId: ID!, operation: String!, input: JSON!): JSON! }
