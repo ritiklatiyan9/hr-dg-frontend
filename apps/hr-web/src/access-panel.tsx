@@ -30,7 +30,7 @@ import {
   type AccessChangeInput,
   type PreviewAccessMutation,
   type SaveAccessMutation,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import {
   useScope,
   useScopedQuery,

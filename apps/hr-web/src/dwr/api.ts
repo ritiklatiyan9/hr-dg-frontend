@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   DwrChatDocument,
   DwrCommandDocument,
-} from "../../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import { gql } from "../api";
 import {
   useScope,

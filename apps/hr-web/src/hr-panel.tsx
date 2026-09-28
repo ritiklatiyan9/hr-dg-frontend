@@ -53,17 +53,17 @@ import {
   OperateDocument,
   HrRecordsDocument,
   HrCommandDocument,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import {
   hrKinds,
   hrLabels,
   hrModules,
   type HrKind,
-} from "../../../packages/contracts/hr";
+} from "@/shared/contracts/hr";
 import {
   money as plainMoney,
   rupeesToPaise,
-} from "../../../packages/contracts/payroll";
+} from "@/shared/contracts/payroll";
 import { uploadEvidence } from "./api";
 import { useScope, useScopedQuery, useWrite } from "./workspace-context";
 import {

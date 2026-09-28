@@ -31,7 +31,7 @@ import {
   UsersRound,
 } from "lucide-react";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import type { HrKind } from "../../../packages/contracts/hr";
+import type { HrKind } from "@/shared/contracts/hr";
 import { lazy, Suspense, useContext, useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, Link, Navigate } from "react-router-dom";
 import {
@@ -64,7 +64,7 @@ import {
   SiteScopeDocument,
   type BootstrapQuery,
   type SiteScopeQuery,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import { gql } from "./api";
 import { ScopeBoundary, scopeKey } from "./scope";
 import { ScopeContext } from "./workspace-context";

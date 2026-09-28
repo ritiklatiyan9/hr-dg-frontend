@@ -38,14 +38,14 @@ import {
 import {
   PayrollDocument,
   PayrollCommandDocument,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import {
   calculatePayroll,
   importPayrollCsv,
   money as plainMoney,
   rupeesToPaise,
   paymentMethods,
-} from "../../../packages/contracts/payroll";
+} from "@/shared/contracts/payroll";
 import { useScope, useScopedQuery, useWrite } from "./workspace-context";
 import { Dialog as PanelDialog, ErrorState, humanize, useT } from "./ui";
 import { FacetedFilter } from "./components/shared/faceted-filter";

@@ -6,7 +6,7 @@ import { FileText, MessageSquare, Settings2, Users } from "lucide-react";
 import {
   DwrCommandDocument,
   DwrDocument,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import { useScope, useScopedQuery, useWrite } from "./workspace-context";
 import { ErrorState, PageSkeleton, useT } from "./ui";
 import { useUrlChoice } from "./hooks/use-url-choice";

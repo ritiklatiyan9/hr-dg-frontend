@@ -23,7 +23,7 @@ import {
   EmployeesDocument,
   OperateDocument,
   OperationsDocument,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import { uploadEvidence } from "./api";
 import { useScope, useScopedQuery, useWrite } from "./workspace-context";
 import { Empty, ErrorState, Heading, PageSkeleton, useT } from "./ui";

@@ -14,11 +14,11 @@ import {
   Undo2,
   X,
 } from "lucide-react";
-import { DwrDocument } from "../../../../packages/contracts/src/generated";
+import { DwrDocument } from "@/shared/contracts/generated";
 import {
   dwrContent,
   type DwrContent,
-} from "../../../../packages/contracts/dwr";
+} from "@/shared/contracts/dwr";
 import { uploadEvidence } from "../api";
 import { useScope, useScopedQuery } from "../workspace-context";
 import { useT } from "../ui";

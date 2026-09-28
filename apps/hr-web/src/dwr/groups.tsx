@@ -16,7 +16,7 @@ import {
 import {
   dwrGroupDescription,
   dwrGroupName,
-} from "../../../../packages/contracts/dwr";
+} from "@/shared/contracts/dwr";
 import { useScope } from "../workspace-context";
 import { useT } from "../ui";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";

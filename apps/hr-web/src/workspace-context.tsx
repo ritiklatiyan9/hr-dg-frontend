@@ -2,7 +2,7 @@ import { toast } from "sonner";
 import { createContext, useContext } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DocumentNode } from "graphql";
-import type { SiteScopeQuery } from "../../../packages/contracts/src/generated";
+import type { SiteScopeQuery } from "@/shared/contracts/generated";
 import { gql } from "./api";
 import { ScopeBoundary } from "./scope";
 export interface WorkspaceScope {

@@ -16,8 +16,8 @@ import {
 import {
   TrackingMonitorDocument,
   TrackingCommandDocument,
-} from "../../../packages/contracts/src/generated";
-import { trackingStatus } from "../../../packages/attendance/src/tracking";
+} from "@/shared/contracts/generated";
+import { trackingStatus } from "@/shared/attendance/tracking";
 import { useScope, useScopedQuery, useWrite } from "./workspace-context";
 import { DutySchedule } from "./duty-schedule";
 import { Badge, Dialog, Empty, ErrorState, Skeleton } from "./ui";

@@ -12,14 +12,14 @@ import {
 import {
   PayrollCommandDocument,
   PayrollDocument,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import {
   defaultPayslipDesign,
   payslipDesign,
   renderPayslipHtml,
   type PayslipData,
   type PayslipDesign,
-} from "../../../packages/contracts/payslip";
+} from "@/shared/contracts/payslip";
 import { useScope, useScopedQuery, useWrite } from "./workspace-context";
 import { ErrorState, useT } from "./ui";
 import { Desk, DeskHeader } from "./components/shared/desk";

@@ -5,7 +5,7 @@ import {
   OperateDocument,
   EmployeesDocument,
   FoundationDocument,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import { useScope, useScopedQuery, useWrite } from "./workspace-context";
 import { ErrorState } from "./ui";
 import { Button } from "./components/ui/button";

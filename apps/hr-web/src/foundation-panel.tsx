@@ -87,7 +87,7 @@ import {
   type ExportJobQuery,
   type OrganizationReportQuery,
   type AuditHistoryQuery,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import { rest } from "./api";
 import { HrList } from "./hr-panel";
 import { DutySchedule } from "./duty-schedule";

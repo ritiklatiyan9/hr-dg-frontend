@@ -26,7 +26,7 @@ import {
   Trash2,
   Users,
 } from "lucide-react";
-import { DWR_MESSAGE_MAX } from "../../../../packages/contracts/dwr";
+import { DWR_MESSAGE_MAX } from "@/shared/contracts/dwr";
 import { useScope } from "../workspace-context";
 import { useT } from "../ui";
 import { cn } from "@/lib/utils";

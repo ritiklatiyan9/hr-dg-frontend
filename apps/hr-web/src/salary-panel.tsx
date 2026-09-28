@@ -10,11 +10,11 @@ import {
 import {
   PayrollDocument,
   PayrollCommandDocument,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import {
   calculatePayroll,
   rupeesToPaise,
-} from "../../../packages/contracts/payroll";
+} from "@/shared/contracts/payroll";
 import { useScope, useScopedQuery, useWrite } from "./workspace-context";
 import { ErrorState, PageSkeleton, useT } from "./ui";
 import {

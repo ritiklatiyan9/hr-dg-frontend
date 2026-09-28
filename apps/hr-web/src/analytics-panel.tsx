@@ -17,13 +17,13 @@ import {
 import {
   AnalyticsDocument,
   ExplainAnalyticsDocument,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import type {
   AnalyticsSite,
   AnalyticsSnapshot,
   Metric,
-} from "../../../packages/contracts/analytics";
-import { money } from "../../../packages/contracts/payroll";
+} from "@/shared/contracts/analytics";
+import { money } from "@/shared/contracts/payroll";
 import { useScope, useScopedQuery, useWrite } from "./workspace-context";
 import {
   Badge as StatusBadge,

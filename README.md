@@ -2,6 +2,19 @@
 
 Defence Garden HR panel. The API is at <https://hr-dg-backend.onrender.com>.
 
+## Vercel deployment
+
+Set the Vercel **Root Directory** to `apps/hr-web` and use the Vite defaults:
+`npm run build` and output directory `dist`. This directory has its own
+`package.json`, lockfile, and `vercel.json`; it builds without files above the
+Vercel root. The Vercel config forwards API paths through a same-origin proxy to
+the Render backend and serves `index.html` for frontend routes on refresh.
+
+The API proxy preserves the browser's session and CSRF cookies and rejects
+requests from other origins. Vercel Routing Middleware has a 4 MB request body
+limit, so larger attachments need a separate upload path before that feature is
+used on Vercel.
+
 ## Local development
 
 Use Node 24 LTS and npm:
@@ -20,9 +33,7 @@ npm run typecheck
 npm run build
 ```
 
-The app uses same-origin session and CSRF cookies. Serve the built
-`apps/hr-web/dist` files from the API origin, or place an authenticated reverse
-proxy on the frontend origin that forwards API requests and cookies to the API.
-A static host on a separate origin cannot call the Render API directly with the
-current backend origin and cookie policy. The live panel is available at the
-backend URL above.
+The app uses same-origin session and CSRF cookies. A plain static host on a
+separate origin cannot call the Render API directly with the current backend
+origin and cookie policy. The Vercel proxy provides that same-origin path; the
+panel served by the backend itself remains available at the backend URL above.

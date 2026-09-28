@@ -1,4 +1,4 @@
-import { money as exactMoney } from "../../../../../packages/contracts/payroll.js";
+import { money as exactMoney } from "@/shared/contracts/payroll";
 /** Exact paise formatting: no conversion to floating-point numbers. */
 export function formatMoney(paise: string) {
   const amount = BigInt(paise),

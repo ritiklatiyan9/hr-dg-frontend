@@ -4,7 +4,7 @@ import { KeyRound, Search, ShieldCheck, Workflow } from "lucide-react";
 import {
   AccessUsersDocument,
   RoleMatrixDocument,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import { useScope, useScopedQuery } from "./workspace-context";
 import { ErrorState, PageSkeleton, useT } from "./ui";
 import { Desk, DeskHeader, Pill } from "./components/shared/desk";

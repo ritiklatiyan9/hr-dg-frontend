@@ -23,8 +23,8 @@ import {
 import {
   DashboardDocument,
   EmployeeLookupDocument,
-} from "../../../packages/contracts/src/generated";
-import type { DashboardSnapshot } from "../../../packages/contracts/dashboard";
+} from "@/shared/contracts/generated";
+import type { DashboardSnapshot } from "@/shared/contracts/dashboard";
 import { useScope, useScopedQuery } from "./workspace-context";
 import { ErrorState, Heading, Skeleton, humanize, useT } from "./ui";
 import { Section, StatCard } from "./components/shared/page";

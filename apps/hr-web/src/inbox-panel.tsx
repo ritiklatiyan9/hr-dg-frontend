@@ -5,7 +5,7 @@ import type { ColumnDef } from "@tanstack/react-table";
 import {
   OperationsDocument,
   OperateDocument,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import { useScope, useScopedQuery, useWrite } from "./workspace-context";
 import {
   Badge,

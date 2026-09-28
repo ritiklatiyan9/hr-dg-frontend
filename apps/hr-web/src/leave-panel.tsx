@@ -17,7 +17,7 @@ import {
   EmployeesDocument,
   OperateDocument,
   OperationsDocument,
-} from "../../../packages/contracts/src/generated";
+} from "@/shared/contracts/generated";
 import { useScope, useScopedQuery, useWrite } from "./workspace-context";
 import {
   Badge as StatusBadge,
