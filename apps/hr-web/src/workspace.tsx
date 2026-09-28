@@ -239,19 +239,15 @@ function WorkspaceBody({ onLogout }: { onLogout: () => Promise<void> }) {
       window.removeEventListener("dg:scope-changed", invalid);
     };
   }, [b?.actor.id]);
-  // Remove visible records immediately while revalidating after a background/foreground transition.
+  // Revalidate the session on return without discarding a still-valid workspace.
+  // Identity/version changes and access failures below clear scoped records.
   useEffect(() => {
-    const revalidate = async () => {
-      if (document.visibilityState !== "visible") {
-        setChecking(true);
-        clearScoped();
-        return;
-      }
-      reload();
+    const revalidate = () => {
+      if (document.visibilityState === "visible") void boot.refetch();
     };
     document.addEventListener("visibilitychange", revalidate);
     return () => document.removeEventListener("visibilitychange", revalidate);
-  }, []);
+  }, [boot.refetch]);
   useEffect(() => {
     if (boot.error && (!b || !isTransientFailure(boot.error))) clearScoped();
   }, [boot.error, b]);
